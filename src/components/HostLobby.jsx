@@ -1,53 +1,54 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { socket } from '../socket'
 import LetterGlitch from './ui/LetterGlitch'
 
 export default function HostLobby({ onGameStart }) {
-  const [step, setStep] = useState('enter_name') // enter_name | waiting
+  const [step, setStep] = useState('enter_name')
   const [hostName, setHostName] = useState('')
   const [roomCode, setRoomCode] = useState('')
   const [players, setPlayers] = useState([])
   const [error, setError] = useState('')
+  const roomCodeRef = useRef('')
 
   useEffect(() => {
-  socket.connect()
+    socket.connect()
 
-  socket.on('room_created', ({ code }) => {
-    setRoomCode(code)
-    setStep('waiting')
-  })
+    socket.on('room_created', ({ code }) => {
+      roomCodeRef.current = code
+      setRoomCode(code)
+      setStep('waiting')
+    })
 
-  socket.on('lobby_update', (updatedPlayers) => {
-    setPlayers(updatedPlayers)
-  })
+    socket.on('lobby_update', (updatedPlayers) => {
+      setPlayers(updatedPlayers)
+    })
 
-  socket.on('game_started', ({ assignedPlayers }) => {
-    console.log('assignedPlayers received:', assignedPlayers)
-    onGameStart(assignedPlayers, roomCode)
-  })
+    socket.on('game_started', ({ assignedPlayers }) => {
+      onGameStart(assignedPlayers, roomCodeRef.current)
+    })
 
-  socket.on('error', (msg) => setError(msg))
+    socket.on('join_error', (msg) => setError(msg))
 
-  return () => {
-    socket.off('room_created')
-    socket.off('lobby_update')
-    socket.off('game_started')
-    socket.off('error')
-  }
-}, [])
+    return () => {
+      socket.off('room_created')
+      socket.off('lobby_update')
+      socket.off('game_started')
+      socket.off('join_error')
+    }
+  }, [])
 
   function createRoom() {
     if (!hostName.trim()) { setError('ENTER YOUR NAME'); return }
     sessionStorage.setItem('playerName', hostName.trim())
+    sessionStorage.setItem('mySocketId', socket.id)
     socket.emit('create_room', { hostName: hostName.trim() })
   }
 
   function startGame() {
     if (players.length < 4) { setError('NEED AT LEAST 4 PLAYERS'); return }
-    socket.emit('start_game', { code: roomCode })
-  // don't call onGameStart here — wait for server response
-}
+    socket.emit('start_game', { code: roomCodeRef.current })
+  }
 
   const joinUrl = `${window.location.origin}?join=${roomCode}`
 
@@ -58,8 +59,6 @@ export default function HostLobby({ onGameStart }) {
       alignItems: 'center', justifyContent: 'center',
       position: 'relative', overflow: 'visible', padding: '1.5rem'
     }}>
-
-      {/* Background */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
         <LetterGlitch glitchSpeed={50} centerVignette smooth speed={10}
           colors={["#2b4539", "#61dca3", "#61b3dc"]} />
@@ -69,7 +68,6 @@ export default function HostLobby({ onGameStart }) {
         background: 'radial-gradient(ellipse at center, rgba(5,15,10,0.85) 0%, rgba(5,15,10,0.3) 100%)'
       }} />
 
-      {/* Back button */}
       <button onClick={() => window.location.reload()} className="mono" style={{
         position: 'fixed', top: '1rem', left: '1rem', zIndex: 10,
         background: 'none', border: 'none', color: '#4ade80',
@@ -80,8 +78,6 @@ export default function HostLobby({ onGameStart }) {
         position: 'relative', zIndex: 10, width: '100%', maxWidth: '420px',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem'
       }}>
-
-        {/* Header */}
         <div style={{ textAlign: 'center' }}>
           <div className="mono" style={{ color: '#4ade80', fontSize: '0.7rem', letterSpacing: '0.4em', marginBottom: '0.5rem' }}>
             [ HOST GAME ]
@@ -114,34 +110,26 @@ export default function HostLobby({ onGameStart }) {
                 style={{
                   background: '#050f0a', border: '1px solid #1a3a22',
                   borderRadius: '0.5rem', padding: '0.75rem 1rem',
-                  color: '#86efac', fontSize: '1rem', outline: 'none',
-                  width: '100%'
+                  color: '#86efac', fontSize: '1rem', outline: 'none', width: '100%'
                 }}
                 onFocus={e => e.target.style.borderColor = '#22c55e'}
                 onBlur={e => e.target.style.borderColor = '#1a3a22'}
                 autoFocus
               />
             </div>
-
             {error && (
-              <p className="mono" style={{
-                color: '#dc2626', fontSize: '0.75rem',
-                letterSpacing: '0.2em', textAlign: 'center'
-              }}>⚠ {error}</p>
+              <p className="mono" style={{ color: '#dc2626', fontSize: '0.75rem', letterSpacing: '0.2em', textAlign: 'center' }}>
+                ⚠ {error}
+              </p>
             )}
-
             <button onClick={createRoom} className="mono" style={{
-              width: '100%', padding: '1.1rem',
-              fontWeight: '700', fontSize: '0.85rem',
+              width: '100%', padding: '1.1rem', fontWeight: '700', fontSize: '0.85rem',
               letterSpacing: '0.3em', borderRadius: '9999px',
               background: 'linear-gradient(135deg, #bbf7d0 0%, #22c55e 40%, #15803d 100%)',
               border: 'none', color: '#052e16', cursor: 'pointer',
               boxShadow: '0 0 30px rgba(34,197,94,0.4), inset 0 1px 0 rgba(255,255,255,0.25)',
               transition: 'all 0.3s'
-            }}
-              onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 60px rgba(34,197,94,0.6), inset 0 1px 0 rgba(255,255,255,0.3)'}
-              onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 30px rgba(34,197,94,0.4), inset 0 1px 0 rgba(255,255,255,0.25)'}
-            >
+            }}>
               CREATE ROOM →
             </button>
           </div>
@@ -149,8 +137,6 @@ export default function HostLobby({ onGameStart }) {
 
         {step === 'waiting' && (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.25rem', alignItems: 'center' }}>
-
-            {/* QR Code */}
             <div style={{
               background: '#ffffff', borderRadius: '1rem',
               padding: '1rem', display: 'inline-block',
@@ -170,15 +156,11 @@ export default function HostLobby({ onGameStart }) {
               }}>{roomCode}</p>
             </div>
 
-            {/* Player list */}
             <div style={{
               width: '100%', background: '#0a1a10',
               border: '1px solid #1a3a22', borderRadius: '1rem', padding: '1.25rem'
             }}>
-              <div className="mono" style={{
-                color: '#4ade80', fontSize: '0.7rem',
-                letterSpacing: '0.3em', marginBottom: '0.75rem'
-              }}>
+              <div className="mono" style={{ color: '#4ade80', fontSize: '0.7rem', letterSpacing: '0.3em', marginBottom: '0.75rem' }}>
                 PLAYERS [{players.length}]
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -195,18 +177,16 @@ export default function HostLobby({ onGameStart }) {
                       {p.name}
                     </span>
                     {p.isHost && (
-                      <span className="mono" style={{
-                        color: '#4ade80', fontSize: '0.6rem',
-                        letterSpacing: '0.2em', marginLeft: 'auto'
-                      }}>HOST</span>
+                      <span className="mono" style={{ color: '#4ade80', fontSize: '0.6rem', letterSpacing: '0.2em', marginLeft: 'auto' }}>
+                        HOST
+                      </span>
                     )}
                   </div>
                 ))}
                 {players.length === 0 && (
-                  <p className="mono" style={{
-                    color: '#1a3a22', fontSize: '0.75rem',
-                    letterSpacing: '0.2em', textAlign: 'center', padding: '0.5rem'
-                  }}>WAITING FOR PLAYERS...</p>
+                  <p className="mono" style={{ color: '#1a3a22', fontSize: '0.75rem', letterSpacing: '0.2em', textAlign: 'center', padding: '0.5rem' }}>
+                    WAITING FOR PLAYERS...
+                  </p>
                 )}
               </div>
             </div>
@@ -222,8 +202,7 @@ export default function HostLobby({ onGameStart }) {
               disabled={players.length < 4}
               className="mono"
               style={{
-                width: '100%', padding: '1.1rem',
-                fontWeight: '700', fontSize: '0.85rem',
+                width: '100%', padding: '1.1rem', fontWeight: '700', fontSize: '0.85rem',
                 letterSpacing: '0.3em', borderRadius: '9999px',
                 background: players.length >= 4
                   ? 'linear-gradient(135deg, #bbf7d0 0%, #22c55e 40%, #15803d 100%)'
@@ -235,7 +214,9 @@ export default function HostLobby({ onGameStart }) {
                 transition: 'all 0.3s'
               }}
             >
-              {players.length >= 4 ? 'START GAME →' : `NEED ${4 - players.length} MORE PLAYER${4 - players.length === 1 ? '' : 'S'}`}
+              {players.length >= 4
+                ? 'START GAME →'
+                : `NEED ${4 - players.length} MORE PLAYER${4 - players.length === 1 ? '' : 'S'}`}
             </button>
           </div>
         )}

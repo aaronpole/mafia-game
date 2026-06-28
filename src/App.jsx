@@ -7,98 +7,93 @@ import GameOver from './components/GameOver'
 import HostLobby from './components/HostLobby'
 import JoinGame from './components/JoinGame'
 
-function assignRoles(players) {
-  const mafiaCount = Math.round(players.length / 3)
-  const roles = [
-    ...Array(mafiaCount).fill('mafia'),
-    ...Array(players.length - mafiaCount).fill('civilian')
-  ]
-  for (let i = roles.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [roles[i], roles[j]] = [roles[j], roles[i]]
-  }
-  return players.map((name, i) => ({ name, role: roles[i], alive: true, id: i }))
-}
-
 export default function App() {
   const [screen, setScreen] = useState('lobby')
   const [players, setPlayers] = useState([])
   const [round, setRound] = useState(1)
-  const [mode, setMode] = useState(null) // 'host' or 'join'
 
   function handleNavigate(destination) {
-  setMode(destination)
-  setScreen(destination)
-}
-
-  function startGame(playerNames) {
-    setPlayers(assignRoles(playerNames))
-    setScreen('roleReveal')
+    setScreen(destination)
   }
 
   function goToRound() { setScreen('round') }
   function goToVote() { setScreen('vote') }
 
-  function eliminatePlayer(id) {
+  function handleEliminate(id, winner) {
+    if (winner) {
+      setScreen(winner === 'mafia' ? 'gameover-mafia' : 'gameover-civilians')
+      return
+    }
+    // Update alive status locally too
     const updated = players.map(p => p.id === id ? { ...p, alive: false } : p)
     setPlayers(updated)
-    const alive = updated.filter(p => p.alive)
-    const aliveMafia = alive.filter(p => p.role === 'mafia').length
-    const aliveCivilians = alive.filter(p => p.role === 'civilian').length
-    if (aliveMafia === 0) setScreen('gameover-civilians')
-    else if (aliveMafia >= aliveCivilians) setScreen('gameover-mafia')
-    else { setRound(r => r + 1); setScreen('round') }
+    setRound(r => r + 1)
+    setScreen('round')
   }
 
-  function restart() { setScreen('lobby'); setRound(1); setPlayers([]); setMode(null) }
+  function restart() {
+    setScreen('lobby')
+    setRound(1)
+    setPlayers([])
+    sessionStorage.clear()
+  }
+
+  // Find this device's role from the players array using socketId
+  function getMyRole() {
+    const mySocketId = sessionStorage.getItem('mySocketId')
+    const myName = sessionStorage.getItem('playerName')
+    return (
+      players.find(p => p.socketId === mySocketId) ||
+      players.find(p => p.name === myName) ||
+      players[0]
+    )
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#050f0a' }}>
       {screen === 'lobby' && <Lobby onNavigate={handleNavigate} />}
+
       {screen === 'host' && (
-      <HostLobby onGameStart={(assignedPlayers, code) => {
-        console.log('setting players:', assignedPlayers)
-        setPlayers(assignedPlayers)
-        sessionStorage.setItem('roomCode', code)
-        setScreen('roleReveal')
-      }} />
+        <HostLobby onGameStart={(assignedPlayers, code) => {
+          setPlayers(assignedPlayers)
+          sessionStorage.setItem('roomCode', code)
+          setScreen('roleReveal')
+        }} />
       )}
+
       {screen === 'join' && (
         <JoinGame
-        prefillCode={new URLSearchParams(window.location.search).get('join') || ''}
-        onJoined={(assignedPlayers) => {
-        if (assignedPlayers) setPlayers(assignedPlayers)
-        setScreen('roleReveal')
-      }}/>
-    )}
-      {screen === 'roleReveal' && (() => {
-        const myName = sessionStorage.getItem('playerName')
-        const myRole = players.find(p => p.name === myName) || players[0]
-        console.log('myName:', myName)
-        console.log('players:', players)
-        console.log('myRole found:', myRole)
-        const mafiaTeam = players.filter(p => p.role === 'mafia').map(p => p.name)
-        return (
-          <RoleReveal
-            myRole={myRole}
-            mafiaTeam={mafiaTeam}
-            onDone={goToRound}
-          />
-        )
-      })()}
-      {screen === 'round' && <RoundScreen players={players} round={round} onTimeUp={goToVote} />}
-      {screen === 'vote' && (
-          <VoteScreen
-            players={players}
-            onEliminate={(id, winner) => {
-            if (winner) {
-              setScreen(winner === 'mafia' ? 'gameover-mafia' : 'gameover-civilians')
-            } else {
-              eliminatePlayer(id)
-            }
-        }}
-      />
+          prefillCode={new URLSearchParams(window.location.search).get('join') || ''}
+          onJoined={(assignedPlayers, code) => {
+            if (assignedPlayers) setPlayers(assignedPlayers)
+            if (code) sessionStorage.setItem('roomCode', code)
+            setScreen('roleReveal')
+          }}
+        />
       )}
+
+      {screen === 'roleReveal' && (
+        <RoleReveal
+          myRole={getMyRole()}
+          mafiaTeam={players.filter(p => p.role === 'mafia').map(p => p.name)}
+          onDone={goToRound}
+        />
+      )}
+
+      {screen === 'round' && (
+        <RoundScreen
+          round={round}
+          onTimeUp={goToVote}
+        />
+      )}
+
+      {screen === 'vote' && (
+        <VoteScreen
+          players={players}
+          onEliminate={handleEliminate}
+        />
+      )}
+
       {(screen === 'gameover-civilians' || screen === 'gameover-mafia') && (
         <GameOver
           winner={screen === 'gameover-mafia' ? 'mafia' : 'civilians'}
