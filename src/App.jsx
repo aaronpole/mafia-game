@@ -64,18 +64,25 @@ export default function App() {
       }} />
       )}
       {screen === 'join' && (
-           <JoinGame
-                prefillCode={new URLSearchParams(window.location.search).get('join') || ''}
-                onJoined={() => setScreen('roleReveal')}
-          />
-      )}
-      {screen === 'roleReveal' && (
-          <RoleReveal
-          myRole={players[0]}
-          mafiaTeam={players.filter(p => p.role === 'mafia').map(p => p.name)}
-          onDone={goToRound}
-        />
+        <JoinGame
+        prefillCode={new URLSearchParams(window.location.search).get('join') || ''}
+        onJoined={(assignedPlayers) => {
+        if (assignedPlayers) setPlayers(assignedPlayers)
+        setScreen('roleReveal')
+      }}/>
     )}
+      {screen === 'roleReveal' && (() => {
+        const myName = sessionStorage.getItem('playerName')
+        const myRole = players.find(p => p.name === myName) || players[0]
+        const mafiaTeam = players.filter(p => p.role === 'mafia').map(p => p.name)
+        return (
+          <RoleReveal
+          myRole={myRole}
+          mafiaTeam={mafiaTeam}
+          onDone={goToRound}
+          />
+        )
+      })()}
       {screen === 'round' && <RoundScreen players={players} round={round} onTimeUp={goToVote} />}
       {screen === 'vote' && (
           <VoteScreen

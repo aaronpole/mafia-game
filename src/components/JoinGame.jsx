@@ -12,8 +12,9 @@ export default function JoinGame({ onJoined, prefillCode }) {
   useEffect(() => {
     socket.connect()
 
-    socket.on('room_joined', ({ players }) => {
+    socket.on('room_joined', ({ code, players }) => {
       setPlayers(players)
+      sessionStorage.setItem('playerName', playerName)
       setStep('waiting')
     })
 
@@ -21,8 +22,8 @@ export default function JoinGame({ onJoined, prefillCode }) {
       setPlayers(updatedPlayers)
     })
 
-    socket.on('game_started', () => {
-      onJoined()
+    socket.on('game_started', ({ assignedPlayers }) => {
+      onJoined(assignedPlayers)
     })
 
     socket.on('error', (msg) => setError(msg))

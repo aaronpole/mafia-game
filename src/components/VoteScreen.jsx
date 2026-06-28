@@ -10,9 +10,13 @@ export default function VoteScreen({ players, onEliminate }) {
   const [eliminated, setEliminated] = useState(null)
   const [phase, setPhase] = useState('voting') // voting | revealing | done
 
-  const alivePlayers = players.filter(p => p.alive)
+  const [alivePlayers, setAlivePlayers] = useState(players.filter(p => p.alive))
 
   useEffect(() => {
+    socket.on('vote_started', ({ alivePlayers }) => {
+      if (alivePlayers) setAlivePlayers(alivePlayers)
+    })
+
     socket.on('vote_update', ({ totalVotes, needed }) => {
       setVoteCount(totalVotes)
       setTotalNeeded(needed)
@@ -21,6 +25,7 @@ export default function VoteScreen({ players, onEliminate }) {
     socket.on('player_eliminated', ({ eliminated, round }) => {
       setEliminated(eliminated)
       setPhase('revealing')
+      setTimeout(() => onEliminate(eliminated?.id), 3000)
     })
 
     socket.on('game_over', ({ winner, eliminated }) => {
@@ -30,6 +35,7 @@ export default function VoteScreen({ players, onEliminate }) {
     })
 
     return () => {
+      socket.off('vote_started')
       socket.off('vote_update')
       socket.off('player_eliminated')
       socket.off('game_over')

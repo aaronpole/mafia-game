@@ -39,6 +39,7 @@ export default function HostLobby({ onGameStart }) {
 
   function createRoom() {
     if (!hostName.trim()) { setError('ENTER YOUR NAME'); return }
+    sessionStorage.setItem('playerName', hostName.trim())
     socket.emit('create_room', { hostName: hostName.trim() })
   }
 
@@ -218,7 +219,7 @@ export default function HostLobby({ onGameStart }) {
 
             <button
               onClick={startGame}
-              disabled={players.length < 1}
+              disabled={players.length < 4}
               className="mono"
               style={{
                 width: '100%', padding: '1.1rem',

@@ -8,19 +8,20 @@ export default function RoundScreen({ players, round, onTimeUp }) {
   const [timeLeft, setTimeLeft] = useState(ROUND_DURATION)
   const [voting, setVoting] = useState(false)
 
-  const alivePlayers = players.filter(p => p.alive)
   const minutes = Math.floor(timeLeft / 60)
   const seconds = timeLeft % 60
   const progress = timeLeft / ROUND_DURATION
 
-  useEffect(() => {
-    socket.on('vote_started', ({ alivePlayers }) => {
-      setVoting(true)
-      setTimeout(() => onTimeUp(), 2000)
-    })
-    return () => socket.off('vote_started')
-  }, [])
+  const [alivePlayers, setAlivePlayers] = useState(
+    players.filter(p => p.alive)
+  )
 
+  useEffect(() => {
+    socket.on('round_started', ({ round, alivePlayers }) => {
+      if (alivePlayers) setAlivePlayers(alivePlayers)
+    })
+    return () => socket.off('round_started')
+  }, [])
   useEffect(() => {
     if (voting) return
     const interval = setInterval(() => {
