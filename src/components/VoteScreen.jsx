@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { socket } from '../socket'
 import LetterGlitch from './ui/LetterGlitch'
 
-export default function VoteScreen({ players, onEliminate }) {
+const VOTE_DURATION = 15 * 1000
+
+export default function VoteScreen({ players, onEliminate, myName }) {
   const [voted, setVoted] = useState(false)
   const [selectedId, setSelectedId] = useState(null)
   const [voteCount, setVoteCount] = useState(0)
@@ -10,10 +12,23 @@ export default function VoteScreen({ players, onEliminate }) {
   const [eliminated, setEliminated] = useState(null)
   const [phase, setPhase] = useState('voting')
   const [alivePlayers, setAlivePlayers] = useState(players.filter(p => p.alive))
+  const [timeLeft, setTimeLeft] = useState(15)
+  const intervalRef = useRef(null)
+
+  function startVoteTimer(startTime, duration) {
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    intervalRef.current = setInterval(() => {
+      const remaining = Math.max(0, duration - (Date.now() - startTime))
+      setTimeLeft(Math.ceil(remaining / 1000))
+      if (remaining <= 0) clearInterval(intervalRef.current)
+    }, 500)
+  }
 
   useEffect(() => {
-    socket.on('vote_started', ({ alivePlayers: ap }) => {
+    socket.on('vote_started', ({ alivePlayers: ap, startTime, duration }) => {
       if (ap && ap.length > 0) setAlivePlayers(ap)
+      setTotalNeeded(ap.length)
+      startVoteTimer(startTime, duration)
     })
 
     socket.on('vote_update', ({ totalVotes, needed }) => {
@@ -22,12 +37,14 @@ export default function VoteScreen({ players, onEliminate }) {
     })
 
     socket.on('player_eliminated', ({ eliminated }) => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
       setEliminated(eliminated)
       setPhase('revealing')
       setTimeout(() => onEliminate(eliminated?.id), 3000)
     })
 
     socket.on('game_over', ({ winner, eliminated }) => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
       setEliminated(eliminated)
       setPhase('done')
       setTimeout(() => onEliminate(eliminated?.id, winner), 4000)
@@ -38,11 +55,12 @@ export default function VoteScreen({ players, onEliminate }) {
       socket.off('vote_update')
       socket.off('player_eliminated')
       socket.off('game_over')
+      if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [])
 
   function castVote(player) {
-    if (voted) return
+    if (voted || timeLeft <= 0) return
     setSelectedId(player.id)
     setVoted(true)
     socket.emit('cast_vote', {
@@ -50,6 +68,10 @@ export default function VoteScreen({ players, onEliminate }) {
       votedId: player.id
     })
   }
+
+  const circumference = 2 * Math.PI * 20
+  const strokeDash = (timeLeft / 15) * circumference
+  const isLow = timeLeft <= 5
 
   return (
     <div style={{
@@ -67,14 +89,13 @@ export default function VoteScreen({ players, onEliminate }) {
         background: 'radial-gradient(ellipse at center, rgba(5,10,5,0.92) 0%, rgba(5,10,5,0.5) 100%)'
       }} />
 
-      {/* Elimination reveal overlay */}
+      {/* Elimination reveal */}
       {(phase === 'revealing' || phase === 'done') && eliminated && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 100,
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(5,5,5,0.95)',
-          animation: 'fadeIn 0.6s ease'
+          background: 'rgba(5,5,5,0.95)', animation: 'fadeIn 0.6s ease'
         }}>
           <style>{`
             @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
@@ -89,7 +110,7 @@ export default function VoteScreen({ players, onEliminate }) {
             </div>
             <div className="mono" style={{
               fontSize: 'clamp(1.8rem, 7vw, 3rem)', fontWeight: '900', color: '#dcfce7',
-              letterSpacing: '0.15em', textShadow: '0 0 30px rgba(220,220,220,0.4)', marginBottom: '0.75rem'
+              letterSpacing: '0.15em', marginBottom: '0.75rem'
             }}>
               {eliminated.name}
             </div>
@@ -102,11 +123,6 @@ export default function VoteScreen({ players, onEliminate }) {
             }}>
               WAS {eliminated.role === 'mafia' ? 'MAFIA 🔪' : 'CIVILIAN 👤'}
             </div>
-            {phase === 'done' && (
-              <div className="mono" style={{ marginTop: '1.5rem', fontSize: '0.7rem', letterSpacing: '0.3em', color: '#1a3a22' }}>
-                CALCULATING RESULT...
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -116,16 +132,43 @@ export default function VoteScreen({ players, onEliminate }) {
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', width: '100%', maxWidth: '420px', gap: '1.5rem'
       }}>
-        <div style={{ textAlign: 'center' }}>
-          <div className="mono" style={{ color: '#ef4444', fontSize: '0.7rem', letterSpacing: '0.4em', marginBottom: '0.4rem' }}>
+        {/* Header with timer */}
+        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="mono" style={{ color: '#ef4444', fontSize: '0.7rem', letterSpacing: '0.4em' }}>
             [ VOTE PHASE ]
           </div>
           <h1 className="mono" style={{
             fontSize: '2rem', fontWeight: '800', color: '#dcfce7',
             letterSpacing: '0.2em', textShadow: '0 0 20px rgba(239,68,68,0.4)'
           }}>WHO IS MAFIA?</h1>
+
+          {/* Circular countdown */}
+          <div style={{ position: 'relative', width: '56px', height: '56px' }}>
+            <svg width="56" height="56" style={{ transform: 'rotate(-90deg)', position: 'absolute' }}>
+              <circle cx="28" cy="28" r="20" fill="none" stroke="#1a0a0a" strokeWidth="3" />
+              <circle cx="28" cy="28" r="20" fill="none"
+                stroke={isLow ? '#dc2626' : '#ef4444'}
+                strokeWidth="3"
+                strokeDasharray={`${circumference}`}
+                strokeDashoffset={circumference - strokeDash}
+                strokeLinecap="round"
+                style={{ transition: 'stroke-dashoffset 0.5s linear' }}
+              />
+            </svg>
+            <div style={{
+              position: 'absolute', inset: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <span className="mono" style={{
+                fontSize: '0.9rem', fontWeight: '700',
+                color: isLow ? '#dc2626' : '#ef4444',
+                textShadow: isLow ? '0 0 15px rgba(220,38,38,0.9)' : 'none'
+              }}>{timeLeft}</span>
+            </div>
+          </div>
         </div>
 
+        {/* Vote progress */}
         {totalNeeded > 0 && (
           <div style={{
             width: '100%', background: '#0a0a0a',
@@ -147,6 +190,7 @@ export default function VoteScreen({ players, onEliminate }) {
           </div>
         )}
 
+        {/* Player list */}
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
           {alivePlayers.map((player) => {
             const isSelected = selectedId === player.id
@@ -154,12 +198,13 @@ export default function VoteScreen({ players, onEliminate }) {
               <button
                 key={player.id}
                 onClick={() => castVote(player)}
-                disabled={voted}
+                disabled={voted || timeLeft <= 0}
                 className="mono"
                 style={{
                   width: '100%', padding: '1rem 1.25rem',
                   display: 'flex', alignItems: 'center', gap: '1rem',
-                  borderRadius: '0.875rem', cursor: voted ? 'default' : 'pointer',
+                  borderRadius: '0.875rem',
+                  cursor: voted || timeLeft <= 0 ? 'default' : 'pointer',
                   transition: 'all 0.2s',
                   background: isSelected ? 'rgba(220,38,38,0.15)' : voted ? '#0a0a0a' : '#0a1a10',
                   border: isSelected ? '1px solid rgba(220,38,38,0.6)' : voted ? '1px solid #0f0f0f' : '1px solid #1a3a22',
@@ -168,13 +213,13 @@ export default function VoteScreen({ players, onEliminate }) {
                   transform: isSelected ? 'scale(1.02)' : 'scale(1)'
                 }}
                 onMouseEnter={e => {
-                  if (!voted) {
+                  if (!voted && timeLeft > 0) {
                     e.currentTarget.style.borderColor = 'rgba(220,38,38,0.4)'
                     e.currentTarget.style.background = 'rgba(220,38,38,0.08)'
                   }
                 }}
                 onMouseLeave={e => {
-                  if (!voted && !isSelected) {
+                  if (!voted && !isSelected && timeLeft > 0) {
                     e.currentTarget.style.borderColor = '#1a3a22'
                     e.currentTarget.style.background = '#0a1a10'
                   }
@@ -189,7 +234,10 @@ export default function VoteScreen({ players, onEliminate }) {
                 }}>
                   {isSelected ? '🔪' : '👤'}
                 </div>
-                <span style={{ color: isSelected ? '#fca5a5' : '#86efac', fontSize: '1rem', fontWeight: '600', letterSpacing: '0.1em' }}>
+                <span style={{
+                  color: isSelected ? '#fca5a5' : '#86efac',
+                  fontSize: '1rem', fontWeight: '600', letterSpacing: '0.1em'
+                }}>
                   {player.name}
                 </span>
                 {isSelected && (
@@ -202,19 +250,13 @@ export default function VoteScreen({ players, onEliminate }) {
           })}
         </div>
 
-        {voted && phase === 'voting' && (
-          <p className="mono" style={{ color: '#15803d', fontSize: '0.7rem', letterSpacing: '0.3em', textAlign: 'center' }}>
-            WAITING FOR OTHER VOTES...
-          </p>
-        )}
-        {!voted && (
-          <p className="mono" style={{
-            color: '#dc2626', fontSize: '0.7rem', letterSpacing: '0.3em', textAlign: 'center',
-            textShadow: '0 0 10px rgba(220,38,38,0.5)'
-          }}>
-            TAP TO CAST YOUR VOTE
-          </p>
-        )}
+        <p className="mono" style={{
+          fontSize: '0.7rem', letterSpacing: '0.3em', textAlign: 'center',
+          color: voted ? '#15803d' : '#dc2626',
+          textShadow: voted ? 'none' : '0 0 10px rgba(220,38,38,0.5)'
+        }}>
+          {voted ? 'VOTE CAST — WAITING FOR TIMER...' : timeLeft <= 0 ? 'VOTING CLOSED' : 'TAP TO CAST YOUR VOTE'}
+        </p>
       </div>
     </div>
   )

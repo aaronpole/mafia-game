@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { socket } from './socket'
 import Lobby from './components/Lobby'
 import RoleReveal from './components/RoleReveal'
 import RoundScreen from './components/RoundScreen'
@@ -6,39 +7,66 @@ import VoteScreen from './components/VoteScreen'
 import GameOver from './components/GameOver'
 import HostLobby from './components/HostLobby'
 import JoinGame from './components/JoinGame'
+import Sacrificed from './components/Sacrificed'
 
 export default function App() {
   const [screen, setScreen] = useState('lobby')
   const [players, setPlayers] = useState([])
   const [round, setRound] = useState(1)
+  const [sacrificedWinner, setSacrificedWinner] = useState(null)
+  const [isSacrificed, setIsSacrificed] = useState(false)
 
-  function handleNavigate(destination) {
-    setScreen(destination)
-  }
+  // Listen for game over while spectating (sacrificed)
+  useEffect(() => {
+    socket.on('game_over', ({ winner }) => {
+      if (isSacrificed) setSacrificedWinner(winner)
+    })
+    socket.on('player_eliminated', ({ eliminated, round: newRound }) => {
+      const myName = sessionStorage.getItem('playerName')
+      if (eliminated?.name === myName) {
+        setIsSacrificed(true)
+        setScreen('sacrificed')
+      } else {
+        const updated = players.map(p =>
+          p.name === eliminated?.name ? { ...p, alive: false } : p
+        )
+        setPlayers(updated)
+        setRound(newRound)
+        setScreen('round')
+      }
+    })
+    return () => {
+      socket.off('game_over')
+      socket.off('player_eliminated')
+    }
+  }, [isSacrificed, players])
 
+  function handleNavigate(destination) { setScreen(destination) }
   function goToRound() { setScreen('round') }
   function goToVote() { setScreen('vote') }
 
   function handleEliminate(id, winner) {
     if (winner) {
-      setScreen(winner === 'mafia' ? 'gameover-mafia' : 'gameover-civilians')
+      if (isSacrificed) {
+        setSacrificedWinner(winner)
+      } else {
+        setScreen(winner === 'mafia' ? 'gameover-mafia' : 'gameover-civilians')
+      }
       return
     }
-    // Update alive status locally too
     const updated = players.map(p => p.id === id ? { ...p, alive: false } : p)
     setPlayers(updated)
-    setRound(r => r + 1)
-    setScreen('round')
   }
 
   function restart() {
     setScreen('lobby')
     setRound(1)
     setPlayers([])
+    setIsSacrificed(false)
+    setSacrificedWinner(null)
     sessionStorage.clear()
   }
 
-  // Find this device's role from the players array using socketId
   function getMyRole() {
     const mySocketId = sessionStorage.getItem('mySocketId')
     const myName = sessionStorage.getItem('playerName')
@@ -80,17 +108,21 @@ export default function App() {
         />
       )}
 
-      {screen === 'round' && (
-        <RoundScreen
-          round={round}
-          onTimeUp={goToVote}
-        />
-      )}
+      {screen === 'round' && <RoundScreen round={round} onTimeUp={goToVote} />}
 
       {screen === 'vote' && (
         <VoteScreen
           players={players}
+          myName={sessionStorage.getItem('playerName')}
           onEliminate={handleEliminate}
+        />
+      )}
+
+      {screen === 'sacrificed' && (
+        <Sacrificed
+          playerName={sessionStorage.getItem('playerName')}
+          winner={sacrificedWinner}
+          onGameOver={restart}
         />
       )}
 
