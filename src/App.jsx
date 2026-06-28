@@ -74,12 +74,15 @@ export default function App() {
       {screen === 'roleReveal' && (() => {
         const myName = sessionStorage.getItem('playerName')
         const myRole = players.find(p => p.name === myName) || players[0]
+        console.log('myName:', myName)
+        console.log('players:', players)
+        console.log('myRole found:', myRole)
         const mafiaTeam = players.filter(p => p.role === 'mafia').map(p => p.name)
         return (
           <RoleReveal
-          myRole={myRole}
-          mafiaTeam={mafiaTeam}
-          onDone={goToRound}
+            myRole={myRole}
+            mafiaTeam={mafiaTeam}
+            onDone={goToRound}
           />
         )
       })()}
