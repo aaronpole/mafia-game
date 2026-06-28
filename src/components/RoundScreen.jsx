@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { socket } from '../socket'
 import LetterGlitch from './ui/LetterGlitch'
 
-const ROUND_DURATION = 5 * 60 * 1000
+const ROUND_DURATION = 10 * 1000
 
 export default function RoundScreen({ round, onTimeUp }) {
   const [timeLeft, setTimeLeft] = useState(ROUND_DURATION / 1000)
