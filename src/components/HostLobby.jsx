@@ -14,6 +14,26 @@ export default function HostLobby({ onGameStart }) {
   useEffect(() => {
     socket.connect()
 
+    // Auto reconnect if socket dropped
+    socket.on('connect', () => {
+      const savedCode = sessionStorage.getItem('roomCode')
+      const savedName = sessionStorage.getItem('playerName')
+      if (savedCode && savedName && roomCodeRef.current) {
+        socket.emit('reconnect_player', {
+          code: savedCode,
+          playerName: savedName
+        })
+      }
+    })
+
+    socket.on('reconnected', ({ assignedPlayers, state, alivePlayers }) => {
+      if (state === 'lobby') {
+        // Just re-request lobby update
+        socket.emit('request_lobby', { code: roomCodeRef.current })
+        setStep('waiting')
+      }
+    })
+
     socket.on('room_created', ({ code }) => {
       roomCodeRef.current = code
       setRoomCode(code)
@@ -31,6 +51,8 @@ export default function HostLobby({ onGameStart }) {
     socket.on('join_error', (msg) => setError(msg))
 
     return () => {
+      socket.off('connect')
+      socket.off('reconnected')
       socket.off('room_created')
       socket.off('lobby_update')
       socket.off('game_started')
