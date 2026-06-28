@@ -1,0 +1,63 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background-color: #050f0a;
+  color: #dcfce7;
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Green scanline overlay on everything */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 255, 100, 0.015) 2px,
+    rgba(0, 255, 100, 0.015) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.mono { font-family: 'Share Tech Mono', monospace; }
+
+/* Glow utilities */
+.glow-green { text-shadow: 0 0 20px #22c55e, 0 0 40px #22c55e66; }
+.glow-red { text-shadow: 0 0 20px #dc2626, 0 0 40px #dc262666; }
+
+/* Pulsing border */
+@keyframes borderPulse {
+  0%, 100% { border-color: #1a3a22; }
+  50% { border-color: #22c55e44; }
+}
+
+/* Flicker */
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.8; }
+  94% { opacity: 1; }
+  96% { opacity: 0.9; }
+  97% { opacity: 1; }
+}
+
+.flicker { animation: flicker 4s infinite; }
+
+/* Blink cursor */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.cursor::after {
+  content: '█';
+  animation: blink 1s infinite;
+  color: #22c55e;
+}
