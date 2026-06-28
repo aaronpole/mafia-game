@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { socket } from '../socket'
 import LetterGlitch from './ui/LetterGlitch'
 
-const ROUND_DURATION = 10 // 10 seconds for testing; change to 5 * 60 * 1000 (5 minutes) for production
+const ROUND_DURATION = 5 * 60 * 1000
 
 export default function RoundScreen({ round, onTimeUp }) {
   const [timeLeft, setTimeLeft] = useState(ROUND_DURATION / 1000)
@@ -33,6 +33,8 @@ export default function RoundScreen({ round, onTimeUp }) {
 
       if (remaining <= 0) {
         clearInterval(intervalRef.current)
+        const code = sessionStorage.getItem('roomCode')
+        socket.emit('start_vote', { code })
         setVoting(true)
         setTimeout(() => onTimeUp(), 3000)
       }
