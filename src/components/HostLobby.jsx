@@ -14,9 +14,10 @@ export default function HostLobby({ onGameStart }) {
   useEffect(() => {
     socket.connect()
 
-    socket.on('room_created', ({ code, reconnectToken }) => {
+    socket.on('room_created', ({ code, reconnectToken, players: createdPlayers }) => {
       roomCodeRef.current = code
       setRoomCode(code)
+      setPlayers(createdPlayers || [{ name: sessionStorage.getItem('playerName'), isHost: true }])
       sessionStorage.setItem('roomCode', code)
       sessionStorage.setItem('reconnectToken', reconnectToken)
       sessionStorage.setItem('isHost', 'true')
