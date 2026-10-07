@@ -3,22 +3,24 @@ import { socket } from '../socket'
 import LetterGlitch from './ui/LetterGlitch'
 
 export default function JoinGame({ onJoined, prefillCode }) {
-  const [step, setStep] = useState('enter')
+  const [step, setStep] = useState(() => sessionStorage.getItem('reconnectToken') ? 'waiting' : 'enter')
   const [playerName, setPlayerName] = useState('')
   const [roomCode, setRoomCode] = useState(prefillCode || '')
   const [players, setPlayers] = useState([])
   const [error, setError] = useState('')
-  const [joinedCode, setJoinedCode] = useState('')
+  const [joinedCode, setJoinedCode] = useState(() => sessionStorage.getItem('roomCode') || '')
 
   useEffect(() => {
     socket.connect()
 
-    socket.on('room_joined', ({ code, players }) => {
+    socket.on('room_joined', ({ code, players, reconnectToken }) => {
       setJoinedCode(code)
       setPlayers(players)
       sessionStorage.setItem('playerName', playerName.trim())
       sessionStorage.setItem('mySocketId', socket.id)
       sessionStorage.setItem('roomCode', code)
+      sessionStorage.setItem('reconnectToken', reconnectToken)
+      sessionStorage.setItem('isHost', 'false')
       setStep('waiting')
     })
 
@@ -38,11 +40,11 @@ export default function JoinGame({ onJoined, prefillCode }) {
       socket.off('game_started')
       socket.off('join_error')
     }
-  }, [playerName, joinedCode])
+  }, [playerName, joinedCode, onJoined])
 
   function joinRoom() {
     if (!playerName.trim()) { setError('ENTER YOUR NAME'); return }
-    if (!roomCode.trim() || roomCode.trim().length < 5) { setError('ENTER VALID ROOM CODE'); return }
+    if (!roomCode.trim() || roomCode.trim().length !== 6) { setError('ENTER VALID ROOM CODE'); return }
     setError('')
     socket.emit('join_room', {
       code: roomCode.trim().toUpperCase(),
@@ -121,8 +123,8 @@ export default function JoinGame({ onJoined, prefillCode }) {
                   value={roomCode}
                   onChange={e => { setRoomCode(e.target.value.toUpperCase()); setError('') }}
                   onKeyDown={e => e.key === 'Enter' && joinRoom()}
-                  placeholder="XXXXX"
-                  maxLength={5}
+                  placeholder="XXXXXX"
+                  maxLength={6}
                   className="mono"
                   style={{
                     background: '#050f0a', border: '1px solid #1a3a22',

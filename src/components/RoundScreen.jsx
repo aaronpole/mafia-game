@@ -8,20 +8,20 @@ export default function RoundScreen({ round, onTimeUp }) {
   const [timeLeft, setTimeLeft] = useState(ROUND_DURATION / 1000)
   const [voting, setVoting] = useState(false)
   const [alivePlayers, setAlivePlayers] = useState([])
+  const [duration, setDuration] = useState(ROUND_DURATION)
   const intervalRef = useRef(null)
   const startTimeRef = useRef(null)
-  const durationRef = useRef(ROUND_DURATION)
 
   const minutes = Math.floor(timeLeft / 60)
   const seconds = timeLeft % 60
-  const progress = timeLeft / (durationRef.current / 1000)
+  const progress = timeLeft / (duration / 1000)
   const circumference = 2 * Math.PI * 120
   const strokeDash = progress * circumference
   const isLow = timeLeft <= 60
 
   function startTimer(startTime, duration) {
     startTimeRef.current = startTime
-    durationRef.current = duration
+    setDuration(duration)
 
     if (intervalRef.current) clearInterval(intervalRef.current)
 
@@ -33,10 +33,6 @@ export default function RoundScreen({ round, onTimeUp }) {
 
       if (remaining <= 0) {
         clearInterval(intervalRef.current)
-        const code = sessionStorage.getItem('roomCode')
-        socket.emit('start_vote', { code })
-        setVoting(true)
-        setTimeout(() => onTimeUp(), 3000)
       }
     }, 500) // Update every 500ms for accuracy
   }
@@ -45,7 +41,7 @@ export default function RoundScreen({ round, onTimeUp }) {
     // Ask server for current round state (in case we missed round_started)
     const code = sessionStorage.getItem('roomCode')
 
-    socket.on('round_started', ({ round, startTime, duration, alivePlayers }) => {
+    socket.on('round_started', ({ startTime, duration, alivePlayers }) => {
       if (alivePlayers) setAlivePlayers(alivePlayers)
       startTimer(startTime, duration)
     })
@@ -67,7 +63,7 @@ export default function RoundScreen({ round, onTimeUp }) {
       socket.off('vote_started')
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [])
+  }, [onTimeUp])
 
   return (
     <div style={{

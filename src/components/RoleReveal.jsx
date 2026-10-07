@@ -28,7 +28,7 @@ export default function RoleReveal({ myRole, mafiaTeam, onDone }) {
       })
     }, 1000)
     return () => clearInterval(interval)
-  }, [flipped])
+  }, [flipped, onDone])
 
   if (!myRole) return (
     <div style={{

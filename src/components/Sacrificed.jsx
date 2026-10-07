@@ -38,6 +38,11 @@ export default function Sacrificed({ playerName, onGameOver, winner }) {
           <p className="mono" style={{ color: '#4ade80', fontSize: '0.8rem', letterSpacing: '0.2em' }}>
             you were sacrificed, {playerName}
           </p>
+          <button onClick={onGameOver} className="mono" style={{
+            marginTop: '1rem', padding: '0.9rem 1.5rem', borderRadius: '0.5rem',
+            border: '1px solid #1a3a22', background: '#0a1a10', color: '#86efac',
+            letterSpacing: '0.2em', cursor: 'pointer'
+          }}>PLAY AGAIN</button>
         </div>
       </div>
     )

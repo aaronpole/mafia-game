@@ -2,8 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { socket } from '../socket'
 import LetterGlitch from './ui/LetterGlitch'
 
-const VOTE_DURATION = 15 * 1000
-
 export default function VoteScreen({ players, onEliminate, myName }) {
   const [voted, setVoted] = useState(false)
   const [selectedId, setSelectedId] = useState(null)
@@ -13,6 +11,7 @@ export default function VoteScreen({ players, onEliminate, myName }) {
   const [phase, setPhase] = useState('voting')
   const [alivePlayers, setAlivePlayers] = useState(players.filter(p => p.alive))
   const [timeLeft, setTimeLeft] = useState(15)
+  const [duration, setDuration] = useState(15)
   const intervalRef = useRef(null)
 
   function startVoteTimer(startTime, duration) {
@@ -25,9 +24,11 @@ export default function VoteScreen({ players, onEliminate, myName }) {
   }
 
   useEffect(() => {
-    socket.on('vote_started', ({ alivePlayers: ap, startTime, duration }) => {
+    socket.on('vote_started', ({ alivePlayers: ap, startTime, duration, alreadyVoted }) => {
       if (ap && ap.length > 0) setAlivePlayers(ap)
       setTotalNeeded(ap.length)
+      setDuration(duration / 1000)
+      if (alreadyVoted) setVoted(true)
       startVoteTimer(startTime, duration)
     })
 
@@ -50,6 +51,8 @@ export default function VoteScreen({ players, onEliminate, myName }) {
       setTimeout(() => onEliminate(eliminated?.id, winner), 4000)
     })
 
+    socket.emit('start_vote', { code: sessionStorage.getItem('roomCode') })
+
     return () => {
       socket.off('vote_started')
       socket.off('vote_update')
@@ -57,10 +60,10 @@ export default function VoteScreen({ players, onEliminate, myName }) {
       socket.off('game_over')
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [])
+  }, [onEliminate])
 
   function castVote(player) {
-    if (voted || timeLeft <= 0) return
+    if (voted || timeLeft <= 0 || player.name === myName) return
     setSelectedId(player.id)
     setVoted(true)
     socket.emit('cast_vote', {
@@ -70,7 +73,7 @@ export default function VoteScreen({ players, onEliminate, myName }) {
   }
 
   const circumference = 2 * Math.PI * 20
-  const strokeDash = (timeLeft / 15) * circumference
+  const strokeDash = (timeLeft / duration) * circumference
   const isLow = timeLeft <= 5
 
   return (
@@ -198,7 +201,7 @@ export default function VoteScreen({ players, onEliminate, myName }) {
               <button
                 key={player.id}
                 onClick={() => castVote(player)}
-                disabled={voted || timeLeft <= 0}
+                disabled={voted || timeLeft <= 0 || player.name === myName}
                 className="mono"
                 style={{
                   width: '100%', padding: '1rem 1.25rem',

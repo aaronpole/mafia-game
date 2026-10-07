@@ -1,5 +1,7 @@
 import { io } from 'socket.io-client'
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'https://mafia-server-production-e0a2.up.railway.app'
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || (
+	import.meta.env.DEV ? 'http://localhost:3001' : window.location.origin
+)
 
 export const socket = io(SERVER_URL, { autoConnect: false })

@@ -250,10 +250,13 @@ class CanvAscii {
   }
 
   async init() {
+    this.fontFamily = 'IBM Plex Mono'
     try {
       await document.fonts.load('600 200px "IBM Plex Mono"');
       await document.fonts.load('500 12px "IBM Plex Mono"');
-    } catch (e) {}
+    } catch {
+      this.fontFamily = 'monospace'
+    }
     await document.fonts.ready;
     this.setMesh();
     this.setRenderer();
@@ -262,7 +265,7 @@ class CanvAscii {
   setMesh() {
     this.textCanvas = new CanvasTxt(this.textString, {
       fontSize: this.textFontSize,
-      fontFamily: 'IBM Plex Mono',
+      fontFamily: this.fontFamily,
       color: this.textColor
     });
     this.textCanvas.resize();

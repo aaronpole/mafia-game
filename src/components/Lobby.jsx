@@ -1,7 +1,9 @@
 import ASCIIText from './ui/ASCIIText'
 import LetterGlitch from './ui/LetterGlitch'
 
-export default function Lobby({ onNavigate }) {
+export default function Lobby({ onNavigate, connectionStatus }) {
+  const statusLabel = connectionStatus === 'online' ? '● ONLINE'
+    : connectionStatus === 'offline' ? '● OFFLINE' : '● CONNECTING'
   return (
     <div style={{
       minHeight: '100vh',
@@ -40,8 +42,9 @@ export default function Lobby({ onNavigate }) {
       }}>SYS://MAFIA_v1.0</div>
       <div className="mono flicker" style={{
         position: 'absolute', top: '1rem', right: '1rem',
-        fontSize: '0.7rem', letterSpacing: '0.2em', color: '#4ade80', zIndex: 10
-      }}>● ONLINE</div>
+        fontSize: '0.7rem', letterSpacing: '0.2em',
+        color: connectionStatus === 'online' ? '#4ade80' : '#f59e0b', zIndex: 10
+      }}>{statusLabel}</div>
 
       {/* Content */}
       <div style={{
